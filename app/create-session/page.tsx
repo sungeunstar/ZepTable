@@ -34,12 +34,29 @@ export default function CreateSession() {
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Supabase error:', insertError)
+        throw insertError
+      }
+
+      if (!data) {
+        throw new Error('No data returned from insert')
+      }
 
       router.push(`/share-link?sessionId=${data.id}`)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating session:', err)
-      setError('세션 생성에 실패했습니다. 다시 시도해주세요.')
+      const errorMessage = err?.message || '알 수 없는 오류가 발생했습니다'
+
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        setError('네트워크 오류: Supabase 연결을 확인해주세요.')
+      } else if (errorMessage.includes('JWT') || errorMessage.includes('apikey')) {
+        setError('인증 오류: Supabase API 키를 확인해주세요.')
+      } else if (errorMessage.includes('relation') || errorMessage.includes('does not exist')) {
+        setError('데이터베이스 오류: 테이블이 생성되지 않았습니다. supabase-schema.sql을 실행해주세요.')
+      } else {
+        setError(`세션 생성 실패: ${errorMessage}`)
+      }
     } finally {
       setLoading(false)
     }
