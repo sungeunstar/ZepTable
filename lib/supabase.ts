@@ -38,6 +38,8 @@ export type Database = {
           total_members: number
           created_at: string
           voting_active: boolean
+          voting_phase: string
+          creator_name: string | null
         }
         Insert: {
           id?: string
@@ -45,6 +47,8 @@ export type Database = {
           total_members: number
           created_at?: string
           voting_active?: boolean
+          voting_phase?: string
+          creator_name?: string | null
         }
         Update: {
           id?: string
@@ -52,6 +56,8 @@ export type Database = {
           total_members?: number
           created_at?: string
           voting_active?: boolean
+          voting_phase?: string
+          creator_name?: string | null
         }
       }
       keywords: {
@@ -81,6 +87,10 @@ export type Database = {
           description: string | null
           keywords: string[]
           created_at: string
+          link: string | null
+          price_range: string | null
+          is_suggestion: boolean
+          suggested_by: string | null
         }
         Insert: {
           id?: string
@@ -91,6 +101,10 @@ export type Database = {
           description?: string | null
           keywords: string[]
           created_at?: string
+          link?: string | null
+          price_range?: string | null
+          is_suggestion?: boolean
+          suggested_by?: string | null
         }
         Update: {
           id?: string
@@ -101,6 +115,10 @@ export type Database = {
           description?: string | null
           keywords?: string[]
           created_at?: string
+          link?: string | null
+          price_range?: string | null
+          is_suggestion?: boolean
+          suggested_by?: string | null
         }
       }
       votes: {
@@ -120,6 +138,29 @@ export type Database = {
           id?: string
           user_id?: string
           place_id?: string
+          created_at?: string
+        }
+      }
+      keyword_votes: {
+        Row: {
+          id: string
+          session_id: string
+          user_id: string
+          keyword: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          user_id: string
+          keyword: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          user_id?: string
+          keyword?: string
           created_at?: string
         }
       }
