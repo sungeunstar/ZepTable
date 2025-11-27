@@ -7,6 +7,7 @@ import Input from '@/components/Input'
 import Card from '@/components/Card'
 import Tag from '@/components/Tag'
 import { supabase } from '@/lib/supabase'
+import { defaultKeywords } from '@/lib/defaultKeywords'
 
 export default function CreateSession() {
   const router = useRouter()
@@ -18,10 +19,6 @@ export default function CreateSession() {
   // Participant management
   const [participantInput, setParticipantInput] = useState('')
   const [participants, setParticipants] = useState<string[]>([])
-
-  // Keyword management
-  const [keywordInput, setKeywordInput] = useState('')
-  const [keywords, setKeywords] = useState<string[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -46,25 +43,6 @@ export default function CreateSession() {
     setParticipants(participants.filter((_, i) => i !== index))
   }
 
-  const handleAddKeyword = () => {
-    const keyword = keywordInput.trim()
-    if (!keyword) return
-
-    // Check for duplicates
-    if (keywords.some(k => k === keyword)) {
-      setError('이미 추가된 키워드입니다')
-      return
-    }
-
-    setKeywords([...keywords, keyword])
-    setKeywordInput('')
-    setError('')
-  }
-
-  const handleRemoveKeyword = (index: number) => {
-    setKeywords(keywords.filter((_, i) => i !== index))
-  }
-
   const handleCreateSession = async () => {
     // Validation
     if (!creatorName.trim()) {
@@ -79,11 +57,6 @@ export default function CreateSession() {
 
     if (participants.length === 0) {
       setError('최소 1명의 참여자를 추가해주세요')
-      return
-    }
-
-    if (keywords.length === 0) {
-      setError('최소 1개의 키워드를 추가해주세요')
       return
     }
 
@@ -127,10 +100,10 @@ export default function CreateSession() {
 
       if (participantsError) throw participantsError
 
-      // 3. Insert keywords
-      const keywordsData = keywords.map(keyword => ({
+      // 3. Insert default keywords
+      const keywordsData = defaultKeywords.map(keyword => ({
         session_id: sessionId,
-        keyword: keyword.trim()
+        keyword: keyword
       }))
 
       const { error: keywordsError } = await supabase
@@ -279,45 +252,25 @@ export default function CreateSession() {
           {/* Keywords Section */}
           <div className="border-t-2 border-surface pt-6">
             <h3 className="text-h3 mb-3">투표 키워드</h3>
-            <p className="text-caption text-text-secondary mb-4">
-              음식 취향이나 분위기 등 원하는 키워드를 추가하세요. 참여자들이 투표합니다.
-            </p>
-
-            <div className="flex gap-2 mb-4">
-              <Input
-                placeholder="키워드 입력 (예: 일식, 매운맛, 조용한)"
-                value={keywordInput}
-                onChange={(e) => setKeywordInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddKeyword()
-                  }
-                }}
-              />
-              <Button onClick={handleAddKeyword} variant="secondary">
-                추가
-              </Button>
-            </div>
-
-            {keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {keywords.map((keyword, index) => (
-                  <Tag
-                    key={index}
-                    className="flex items-center gap-2 bg-secondary-light"
-                  >
-                    #{keyword}
-                    <button
-                      onClick={() => handleRemoveKeyword(index)}
-                      className="text-secondary hover:text-secondary-dark font-bold"
-                    >
-                      ×
-                    </button>
+            <div className="bg-primary-light rounded-button p-4">
+              <p className="text-body text-text-primary mb-2">
+                ✨ 기본 키워드가 자동으로 설정됩니다
+              </p>
+              <p className="text-caption text-text-secondary">
+                {defaultKeywords.length}개의 키워드 (음식 카테고리, 맛 스타일, 식사 분위기, 회피 성향 등)가
+                세션 생성 시 자동으로 추가되어 참여자들이 투표할 수 있습니다.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {defaultKeywords.slice(0, 8).map((keyword, index) => (
+                  <Tag key={index} className="bg-white text-text-primary">
+                    {keyword}
                   </Tag>
                 ))}
+                <Tag className="bg-white text-text-secondary">
+                  +{defaultKeywords.length - 8}개 더
+                </Tag>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Error Message */}
