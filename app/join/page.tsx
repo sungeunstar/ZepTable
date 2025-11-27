@@ -62,7 +62,7 @@ export default function JoinSession() {
 
       if (insertError) throw insertError
 
-      router.push(`/keyword-select?sessionId=${sessionId}&userId=${data.id}`)
+      router.push(`/keyword-voting?sessionId=${sessionId}&userId=${data.id}`)
     } catch (err) {
       console.error('Error joining session:', err)
       setError('참여에 실패했습니다. 다시 시도해주세요.')

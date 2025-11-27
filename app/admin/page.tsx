@@ -1,19 +1,19 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/Button'
 import Input from '@/components/Input'
 import Card from '@/components/Card'
-import KeywordChip from '@/components/KeywordChip'
 import Tag from '@/components/Tag'
 import Toast from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
 
-interface Keyword {
-  id: string
-  label: string
+interface KeywordResult {
+  keyword: string
+  count: number
 }
 
 interface Place {
@@ -22,6 +22,8 @@ interface Place {
   category: string
   keywords: string[]
   description: string | null
+  link: string | null
+  price_range: string | null
 }
 
 export default function Admin() {
@@ -29,27 +31,43 @@ export default function Admin() {
   const sessionId = searchParams.get('sessionId')
 
   const [name, setName] = useState('')
+  const [link, setLink] = useState('')
   const [category, setCategory] = useState('한식')
   const [description, setDescription] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
-  const [availableKeywords, setAvailableKeywords] = useState<Keyword[]>([])
-  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
+  const [priceRange, setPriceRange] = useState('')
   const [places, setPlaces] = useState<Place[]>([])
+  const [keywordResults, setKeywordResults] = useState<KeywordResult[]>([])
   const [loading, setLoading] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
 
   useEffect(() => {
-    fetchKeywords()
     if (sessionId) {
       fetchPlaces()
+      fetchKeywordVotes()
     }
   }, [sessionId])
 
-  const fetchKeywords = async () => {
-    const { data } = await supabase.from('keywords').select('*')
-    if (data) {
-      setAvailableKeywords(data)
+  const fetchKeywordVotes = async () => {
+    if (!sessionId) return
+
+    const { data: votes } = await supabase
+      .from('keyword_votes')
+      .select('keyword')
+      .eq('session_id', sessionId)
+
+    if (votes) {
+      const counts = votes.reduce((acc, vote) => {
+        acc[vote.keyword] = (acc[vote.keyword] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
+      const sorted = Object.entries(counts)
+        .map(([keyword, count]) => ({ keyword, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 7)
+
+      setKeywordResults(sorted)
     }
   }
 
@@ -59,15 +77,10 @@ export default function Admin() {
       .from('places')
       .select('*')
       .eq('session_id', sessionId)
+      .eq('is_suggestion', false)
     if (data) {
       setPlaces(data)
     }
-  }
-
-  const toggleKeyword = (label: string) => {
-    setSelectedKeywords(prev =>
-      prev.includes(label) ? prev.filter(k => k !== label) : [...prev, label]
-    )
   }
 
   const handleAddPlace = async () => {
@@ -89,10 +102,12 @@ export default function Admin() {
       const { error } = await supabase.from('places').insert({
         session_id: sessionId,
         name: name.trim(),
+        link: link.trim() || null,
         category,
         description: description.trim() || null,
-        image_url: imageUrl.trim() || null,
-        keywords: selectedKeywords,
+        price_range: priceRange.trim() || null,
+        keywords: [],
+        is_suggestion: false
       })
 
       if (error) throw error
@@ -101,12 +116,20 @@ export default function Admin() {
       setShowToast(true)
 
       setName('')
+      setLink('')
       setDescription('')
-      setImageUrl('')
-      setSelectedKeywords([])
+      setPriceRange('')
       setCategory('한식')
 
       fetchPlaces()
+
+      // If 2+ places, update voting phase
+      if (places.length + 1 >= 2) {
+        await supabase
+          .from('sessions')
+          .update({ voting_phase: 'place_voting' })
+          .eq('id', sessionId)
+      }
     } catch (err) {
       console.error('Error adding place:', err)
       setToastMessage('장소 추가에 실패했습니다')
@@ -145,17 +168,40 @@ export default function Admin() {
   return (
     <main className="min-h-screen p-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-h2 mb-6">장소 관리 (세션 관리자)</h1>
+        <h1 className="text-h2 mb-6">맛집 후보 등록 (쩝쩝박사)</h1>
+
+        {keywordResults.length > 0 && (
+          <Card className="mb-8 bg-primary-light">
+            <h3 className="text-h3 mb-4">💡 1차 투표 인기 키워드</h3>
+            <div className="flex flex-wrap gap-2">
+              {keywordResults.map((result, idx) => (
+                <Tag key={result.keyword} variant="success">
+                  #{idx + 1} {result.keyword} ({result.count}표)
+                </Tag>
+              ))}
+            </div>
+            <p className="text-caption text-text-secondary mt-3">
+              이 키워드를 참고해서 맛집을 골라주세요!
+            </p>
+          </Card>
+        )}
 
         <Card className="mb-8">
-          <h2 className="text-h3 mb-4">새 장소 추가</h2>
+          <h2 className="text-h3 mb-4">새 맛집 후보 추가</h2>
 
           <div className="space-y-4">
             <Input
-              label="장소 이름"
+              label="가게 이름"
               placeholder="예: 홍대 김치찌개"
               value={name}
               onChange={e => setName(e.target.value)}
+            />
+
+            <Input
+              label="링크 (네이버/카카오맵)"
+              placeholder="https://..."
+              value={link}
+              onChange={e => setLink(e.target.value)}
             />
 
             <div>
@@ -178,47 +224,37 @@ export default function Admin() {
             </div>
 
             <Input
-              label="설명 (선택)"
-              placeholder="간단한 설명을 입력하세요"
+              label="가격대 (선택)"
+              placeholder="예: 10,000~15,000원"
+              value={priceRange}
+              onChange={e => setPriceRange(e.target.value)}
+            />
+
+            <Input
+              label="간단 설명 (선택)"
+              placeholder="한 줄 설명"
               value={description}
               onChange={e => setDescription(e.target.value)}
             />
 
-            <Input
-              label="이미지 URL (선택)"
-              placeholder="https://example.com/image.jpg"
-              value={imageUrl}
-              onChange={e => setImageUrl(e.target.value)}
-            />
-
-            <div>
-              <label className="block text-caption text-text-secondary mb-2">
-                특징 키워드 선택
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {availableKeywords.map(keyword => (
-                  <KeywordChip
-                    key={keyword.id}
-                    label={keyword.label}
-                    selected={selectedKeywords.includes(keyword.label)}
-                    onClick={() => toggleKeyword(keyword.label)}
-                  />
-                ))}
-              </div>
-            </div>
-
             <Button onClick={handleAddPlace} disabled={loading} className="w-full">
-              {loading ? '추가 중...' : '장소 추가'}
+              {loading ? '추가 중...' : '후보 추가'}
             </Button>
           </div>
         </Card>
 
         <div>
-          <h2 className="text-h3 mb-4">등록된 장소 ({places.length}개)</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-h3">등록된 후보 ({places.length}개)</h2>
+            {places.length >= 2 && (
+              <Tag variant="success">2차 투표 시작 가능!</Tag>
+            )}
+          </div>
+
           {places.length === 0 ? (
             <Card>
               <p className="text-text-secondary text-center">
-                아직 등록된 장소가 없습니다
+                아직 등록된 후보가 없습니다. 최소 2개 이상 등록하세요.
               </p>
             </Card>
           ) : (
@@ -227,21 +263,26 @@ export default function Admin() {
                 <Card key={place.id}>
                   <h3 className="text-h3 mb-2">{place.name}</h3>
                   <Tag className="mb-3">{place.category}</Tag>
+                  {place.price_range && (
+                    <p className="text-caption text-text-secondary mb-2">
+                      💰 {place.price_range}
+                    </p>
+                  )}
                   {place.description && (
                     <p className="text-caption text-text-secondary mb-3">
                       {place.description}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {place.keywords.map((keyword, idx) => (
-                      <span
-                        key={idx}
-                        className="text-caption text-text-secondary bg-background px-2 py-1 rounded"
-                      >
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
+                  {place.link && (
+                    <a
+                      href={place.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-caption text-primary hover:underline block mb-3"
+                    >
+                      🔗 지도에서 보기
+                    </a>
+                  )}
                   <Button
                     onClick={() => handleDeletePlace(place.id)}
                     variant="ghost"
@@ -252,6 +293,15 @@ export default function Admin() {
                 </Card>
               ))}
             </div>
+          )}
+
+          {places.length >= 2 && (
+            <Card className="mt-6 bg-primary-light">
+              <h3 className="text-h3 mb-2">✅ 준비 완료!</h3>
+              <p className="text-body text-text-secondary">
+                참여자들에게 링크를 공유하면 2차 투표가 자동으로 시작됩니다.
+              </p>
+            </Card>
           )}
         </div>
       </div>

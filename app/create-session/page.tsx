@@ -9,12 +9,18 @@ import { supabase } from '@/lib/supabase'
 
 export default function CreateSession() {
   const router = useRouter()
+  const [creatorName, setCreatorName] = useState('')
   const [title, setTitle] = useState('')
   const [totalMembers, setTotalMembers] = useState('5')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleCreateSession = async () => {
+    if (!creatorName.trim()) {
+      setError('이름을 입력해주세요')
+      return
+    }
+
     if (!title.trim()) {
       setError('모임 이름을 입력해주세요')
       return
@@ -29,7 +35,9 @@ export default function CreateSession() {
         .insert({
           title: title.trim(),
           total_members: parseInt(totalMembers),
-          voting_active: true
+          voting_active: true,
+          voting_phase: 'keyword_voting',
+          creator_name: creatorName.trim()
         })
         .select()
         .single()
@@ -43,7 +51,7 @@ export default function CreateSession() {
         throw new Error('No data returned from insert')
       }
 
-      router.push(`/share-link?sessionId=${data.id}`)
+      router.push(`/share-link?sessionId=${data.id}&creatorName=${encodeURIComponent(creatorName.trim())}`)
     } catch (err: any) {
       console.error('Error creating session:', err)
       const errorMessage = err?.message || '알 수 없는 오류가 발생했습니다'
@@ -53,7 +61,7 @@ export default function CreateSession() {
       } else if (errorMessage.includes('JWT') || errorMessage.includes('apikey')) {
         setError('인증 오류: Supabase API 키를 확인해주세요.')
       } else if (errorMessage.includes('relation') || errorMessage.includes('does not exist')) {
-        setError('데이터베이스 오류: 테이블이 생성되지 않았습니다. supabase-schema.sql을 실행해주세요.')
+        setError('데이터베이스 오류: 테이블이 생성되지 않았습니다. supabase-migration.sql을 실행해주세요.')
       } else {
         setError(`세션 생성 실패: ${errorMessage}`)
       }
@@ -68,6 +76,13 @@ export default function CreateSession() {
         <h1 className="text-h2 mb-6">새 쩝테이블 만들기</h1>
 
         <div className="space-y-4">
+          <Input
+            label="이름 (쩝쩝박사)"
+            placeholder="세션 생성자 이름"
+            value={creatorName}
+            onChange={(e) => setCreatorName(e.target.value)}
+          />
+
           <Input
             label="모임 이름"
             placeholder="예: 수요 저녁 모임"

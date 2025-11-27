@@ -16,6 +16,10 @@ interface Place {
   keywords: string[]
   description: string | null
   image_url: string | null
+  link: string | null
+  price_range: string | null
+  is_suggestion: boolean
+  suggested_by: string | null
 }
 
 export default function PlaceVote() {
@@ -28,6 +32,10 @@ export default function PlaceVote() {
   const [votedPlaces, setVotedPlaces] = useState<Set<string>>(new Set())
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
+  const [showSuggestModal, setShowSuggestModal] = useState(false)
+  const [suggestName, setSuggestName] = useState('')
+  const [suggestLink, setSuggestLink] = useState('')
+  const [suggestDescription, setSuggestDescription] = useState('')
 
   useEffect(() => {
     if (!sessionId) return
@@ -95,6 +103,51 @@ export default function PlaceVote() {
     router.push(`/live-results?sessionId=${sessionId}`)
   }
 
+  const handleSubmitSuggestion = async () => {
+    if (!suggestName.trim()) {
+      setToastMessage('장소 이름을 입력해주세요')
+      setShowToast(true)
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('places')
+        .insert({
+          session_id: sessionId,
+          name: suggestName.trim(),
+          link: suggestLink.trim() || null,
+          category: '제안',
+          description: suggestDescription.trim() || null,
+          price_range: null,
+          keywords: [],
+          is_suggestion: true,
+          suggested_by: userId
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Add to places list
+      if (data) {
+        setPlaces(prev => [...prev, data])
+      }
+
+      // Reset form and close modal
+      setSuggestName('')
+      setSuggestLink('')
+      setSuggestDescription('')
+      setShowSuggestModal(false)
+      setToastMessage('장소 제안이 등록되었습니다!')
+      setShowToast(true)
+    } catch (err) {
+      console.error('Error submitting suggestion:', err)
+      setToastMessage('제안 등록에 실패했습니다')
+      setShowToast(true)
+    }
+  }
+
   return (
     <main className="min-h-screen p-4 py-8">
       <div className="max-w-4xl mx-auto">
@@ -123,10 +176,30 @@ export default function PlaceVote() {
                   />
                 )}
                 <h3 className="text-h3 mb-2">{place.name}</h3>
-                <Tag className="mb-3">{place.category}</Tag>
+                <div className="flex gap-2 mb-3">
+                  <Tag>{place.category}</Tag>
+                  {place.is_suggestion && (
+                    <Tag className="bg-secondary text-white">참여자 제안</Tag>
+                  )}
+                </div>
                 {place.description && (
                   <p className="text-caption text-text-secondary mb-3">
                     {place.description}
+                  </p>
+                )}
+                {place.link && (
+                  <a
+                    href={place.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-caption text-primary hover:underline mb-2 block"
+                  >
+                    🔗 지도에서 보기
+                  </a>
+                )}
+                {place.price_range && (
+                  <p className="text-caption text-text-secondary mb-3">
+                    💰 {place.price_range}
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -151,12 +224,88 @@ export default function PlaceVote() {
           </div>
         )}
 
-        <div className="sticky bottom-4">
+        <div className="sticky bottom-4 space-y-3">
+          <Button
+            onClick={() => setShowSuggestModal(true)}
+            variant="secondary"
+            className="w-full"
+          >
+            💡 다른 곳 제안하기
+          </Button>
           <Button onClick={handleGoToResults} className="w-full">
             투표 결과 보기
           </Button>
         </div>
       </div>
+
+      {/* Suggestion Modal */}
+      {showSuggestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <h3 className="text-h3 mb-4">다른 곳 제안하기</h3>
+            <p className="text-caption text-text-secondary mb-4">
+              추천하고 싶은 장소가 있다면 제안해주세요!
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-body mb-2">
+                  장소 이름 <span className="text-primary">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={suggestName}
+                  onChange={(e) => setSuggestName(e.target.value)}
+                  placeholder="예: 강남역 맛집"
+                  className="w-full px-4 py-3 border-2 border-surface rounded-button text-body focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-body mb-2">
+                  지도 링크 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={suggestLink}
+                  onChange={(e) => setSuggestLink(e.target.value)}
+                  placeholder="네이버/카카오맵 링크"
+                  className="w-full px-4 py-3 border-2 border-surface rounded-button text-body focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-body mb-2">
+                  한 줄 설명 (선택)
+                </label>
+                <textarea
+                  value={suggestDescription}
+                  onChange={(e) => setSuggestDescription(e.target.value)}
+                  placeholder="이 장소를 추천하는 이유를 간단히 써주세요"
+                  rows={3}
+                  className="w-full px-4 py-3 border-2 border-surface rounded-button text-body focus:outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setShowSuggestModal(false)}
+                  variant="secondary"
+                  className="flex-1"
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={handleSubmitSuggestion}
+                  className="flex-1"
+                >
+                  제안하기
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {showToast && (
         <Toast
