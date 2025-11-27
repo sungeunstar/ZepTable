@@ -40,6 +40,9 @@ export type Database = {
           voting_active: boolean
           voting_phase: string
           creator_name: string | null
+          keyword_voting_active: boolean
+          restaurant_voting_active: boolean
+          description: string | null
         }
         Insert: {
           id?: string
@@ -49,6 +52,9 @@ export type Database = {
           voting_active?: boolean
           voting_phase?: string
           creator_name?: string | null
+          keyword_voting_active?: boolean
+          restaurant_voting_active?: boolean
+          description?: string | null
         }
         Update: {
           id?: string
@@ -58,6 +64,58 @@ export type Database = {
           voting_active?: boolean
           voting_phase?: string
           creator_name?: string | null
+          keyword_voting_active?: boolean
+          restaurant_voting_active?: boolean
+          description?: string | null
+        }
+      }
+      participants: {
+        Row: {
+          id: string
+          session_id: string
+          name: string
+          joined: boolean
+          voted_keywords: boolean
+          voted_restaurant: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          name: string
+          joined?: boolean
+          voted_keywords?: boolean
+          voted_restaurant?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          name?: string
+          joined?: boolean
+          voted_keywords?: boolean
+          voted_restaurant?: boolean
+          created_at?: string
+        }
+      }
+      session_keywords: {
+        Row: {
+          id: string
+          session_id: string
+          keyword: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          keyword: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          keyword?: string
+          created_at?: string
         }
       }
       keywords: {
@@ -86,6 +144,7 @@ export type Database = {
           category: string
           description: string | null
           keywords: string[]
+          tags: string[]
           created_at: string
           link: string | null
           price_range: string | null
@@ -99,7 +158,8 @@ export type Database = {
           image_url?: string | null
           category: string
           description?: string | null
-          keywords: string[]
+          keywords?: string[]
+          tags?: string[]
           created_at?: string
           link?: string | null
           price_range?: string | null
@@ -114,6 +174,7 @@ export type Database = {
           category?: string
           description?: string | null
           keywords?: string[]
+          tags?: string[]
           created_at?: string
           link?: string | null
           price_range?: string | null
@@ -165,5 +226,37 @@ export type Database = {
         }
       }
     }
+    Views: {
+      keyword_results: {
+        Row: {
+          session_id: string
+          keyword: string
+          vote_count: number
+          voters: string[]
+        }
+      }
+      restaurant_results: {
+        Row: {
+          place_id: string
+          session_id: string
+          restaurant_name: string
+          category: string
+          tags: string[]
+          link: string | null
+          price_range: string | null
+          is_suggestion: boolean
+          vote_count: number
+          voters: string[]
+        }
+      }
+    }
   }
 }
+
+// Helper types for common operations
+export type Participant = Database['public']['Tables']['participants']['Row']
+export type SessionKeyword = Database['public']['Tables']['session_keywords']['Row']
+export type KeywordVote = Database['public']['Tables']['keyword_votes']['Row']
+export type Place = Database['public']['Tables']['places']['Row']
+export type Vote = Database['public']['Tables']['votes']['Row']
+export type Session = Database['public']['Tables']['sessions']['Row']

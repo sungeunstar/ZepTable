@@ -66,10 +66,22 @@ export default function PlaceVote() {
   }, [sessionId, userId])
 
   const handleVote = async (placeId: string) => {
-    if (!userId) return
+    if (!userId || !sessionId) return
 
     try {
+      // Check if user has already voted for ANY restaurant
+      const { data: existingVotes } = await supabase
+        .from('votes')
+        .select('place_id, places(session_id)')
+        .eq('user_id', userId)
+
+      // Filter votes for this session only
+      const sessionVotes = existingVotes?.filter(
+        (v: any) => v.places?.session_id === sessionId
+      ) || []
+
       if (votedPlaces.has(placeId)) {
+        // Cancel existing vote
         await supabase
           .from('votes')
           .delete()
@@ -82,7 +94,30 @@ export default function PlaceVote() {
           return next
         })
         setToastMessage('투표가 취소되었습니다')
+
+        // Update participant voted_restaurant status
+        const { data: userData } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', userId)
+          .single()
+
+        if (userData) {
+          await supabase
+            .from('participants')
+            .update({ voted_restaurant: false })
+            .eq('session_id', sessionId)
+            .eq('name', userData.name)
+        }
       } else {
+        // Check 1-person-1-vote rule
+        if (sessionVotes.length > 0) {
+          setToastMessage('이미 다른 음식점에 투표했습니다. 먼저 기존 투표를 취소해주세요.')
+          setShowToast(true)
+          return
+        }
+
+        // Add new vote
         await supabase
           .from('votes')
           .insert({
@@ -90,12 +125,29 @@ export default function PlaceVote() {
             place_id: placeId
           })
 
-        setVotedPlaces(prev => new Set([...prev, placeId]))
+        setVotedPlaces(prev => new Set([placeId]))
         setToastMessage('투표되었습니다!')
+
+        // Update participant voted_restaurant status
+        const { data: userData } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', userId)
+          .single()
+
+        if (userData) {
+          await supabase
+            .from('participants')
+            .update({ voted_restaurant: true })
+            .eq('session_id', sessionId)
+            .eq('name', userData.name)
+        }
       }
       setShowToast(true)
     } catch (err) {
       console.error('Error voting:', err)
+      setToastMessage('투표 중 오류가 발생했습니다')
+      setShowToast(true)
     }
   }
 

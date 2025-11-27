@@ -123,11 +123,14 @@ export default function Admin() {
 
       fetchPlaces()
 
-      // If 2+ places, update voting phase
+      // If 2+ places, enable restaurant voting
       if (places.length + 1 >= 2) {
         await supabase
           .from('sessions')
-          .update({ voting_phase: 'place_voting' })
+          .update({
+            voting_phase: 'place_voting',
+            restaurant_voting_active: true
+          })
           .eq('id', sessionId)
       }
     } catch (err) {
